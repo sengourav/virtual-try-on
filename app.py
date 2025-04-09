@@ -5,7 +5,7 @@ import numpy as np
 from torchvision import transforms
 import torch.nn as nn
 from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
-import cv2
+# import cv2
 import os
 import gdown
 
