@@ -157,6 +157,8 @@
 #     w, h = output_img.size
 #     st.image(output_img, caption="Virtual Try-On Result")
 
+
+
 import streamlit as st
 from PIL import Image
 import torch
@@ -164,35 +166,41 @@ import numpy as np
 from torchvision import transforms
 import torch.nn as nn
 from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
-import os
-import gdown
 import zipfile
+import os
+import subprocess
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ========== Google Drive File IDs ==========
 UNET_MODEL_ID = "1SNdyZM2IWQ6L85VBH-B4JhkGKwEcSq2T"
 PARSER_MODEL_ZIP_ID = "d/1yX05Jx4vdgM9UxC70ByGMpXaPHL6rczb"
 PARSER_PROCESSOR_ZIP_ID = "1sta2fzcBg2SCzWRGwPB7Gz7kclZA3HM_"
 
-# ========== Paths ==========
+# ----------------- Config -----------------
 UNET_PATH = "viton_unet_full_checkpoint.pth"
 PARSER_MODEL_DIR = "human_parser_model"
 PARSER_PROCESSOR_DIR = "human_parser_processor"
 
-# ========== Download Function ==========
-def download_from_drive(file_id, output):
-    gdown.download(f"https://drive.google.com/uc?id={file_id}", output, quiet=False)
 
-# ========== Model Downloads ==========
+# ----------------- Helper: Download from GDrive using wget -----------------
+def download_from_google_drive(file_id, output_path):
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    try:
+        subprocess.run([
+            "wget", "--no-check-certificate", "--content-disposition", "-O", output_path, url
+        ], check=True)
+    except subprocess.CalledProcessError:
+        st.error(f"Failed to download {output_path}")
+
+# ----------------- Download Dependencies -----------------
 if not os.path.exists(UNET_PATH):
     with st.spinner("Downloading UNet model..."):
-        download_from_drive(UNET_MODEL_ID, UNET_PATH)
+        download_from_google_drive(UNET_MODEL_ID, UNET_PATH)
 
 if not os.path.exists(PARSER_MODEL_DIR):
     with st.spinner("Downloading Human Parser Model..."):
         zip_path = "parser_model.zip"
-        download_from_drive(PARSER_MODEL_ZIP_ID, zip_path)
+        download_from_google_drive(PARSER_MODEL_ZIP_ID, zip_path)
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(PARSER_MODEL_DIR)
         os.remove(zip_path)
@@ -200,69 +208,66 @@ if not os.path.exists(PARSER_MODEL_DIR):
 if not os.path.exists(PARSER_PROCESSOR_DIR):
     with st.spinner("Downloading Human Parser Processor..."):
         zip_path = "parser_processor.zip"
-        download_from_drive(PARSER_PROCESSOR_ZIP_ID, zip_path)
+        download_from_google_drive(PARSER_PROCESSOR_ZIP_ID, zip_path)
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(PARSER_PROCESSOR_DIR)
         os.remove(zip_path)
 
-# ========== Load Models ==========
-@st.cache_resource
-def load_models():
-    processor = AutoImageProcessor.from_pretrained(PARSER_PROCESSOR_DIR)
-    parser_model = SegformerForSemanticSegmentation.from_pretrained(PARSER_MODEL_DIR).to(device).eval()
+# ----------------- Load Human Parser -----------------
+processor = AutoImageProcessor.from_pretrained(PARSER_PROCESSOR_DIR)
+parser_model = SegformerForSemanticSegmentation.from_pretrained(PARSER_MODEL_DIR).to(device).eval()
 
-    class UNetGenerator(nn.Module):
-        def __init__(self, in_channels=6, out_channels=3):
-            super(UNetGenerator, self).__init__()
+# ----------------- Define UNet -----------------
+class UNetGenerator(nn.Module):
+    def __init__(self, in_channels=6, out_channels=3):
+        super(UNetGenerator, self).__init__()
 
-            def block(in_c, out_c):
-                return nn.Sequential(
-                    nn.Conv2d(in_c, out_c, 4, 2, 1),
-                    nn.BatchNorm2d(out_c),
-                    nn.ReLU(inplace=True)
-                )
-
-            def up_block(in_c, out_c):
-                return nn.Sequential(
-                    nn.ConvTranspose2d(in_c, out_c, 4, 2, 1),
-                    nn.BatchNorm2d(out_c),
-                    nn.ReLU(inplace=True)
-                )
-
-            self.down1 = block(in_channels, 64)
-            self.down2 = block(64, 128)
-            self.down3 = block(128, 256)
-            self.down4 = block(256, 512)
-
-            self.up1 = up_block(512, 256)
-            self.up2 = up_block(512, 128)
-            self.up3 = up_block(256, 64)
-            self.up4 = nn.Sequential(
-                nn.ConvTranspose2d(128, out_channels, 4, 2, 1),
-                nn.Tanh()
+        def block(in_c, out_c):
+            return nn.Sequential(
+                nn.Conv2d(in_c, out_c, 4, 2, 1),
+                nn.BatchNorm2d(out_c),
+                nn.ReLU(inplace=True)
             )
 
-        def forward(self, x):
-            d1 = self.down1(x)
-            d2 = self.down2(d1)
-            d3 = self.down3(d2)
-            d4 = self.down4(d3)
+        def up_block(in_c, out_c):
+            return nn.Sequential(
+                nn.ConvTranspose2d(in_c, out_c, 4, 2, 1),
+                nn.BatchNorm2d(out_c),
+                nn.ReLU(inplace=True)
+            )
 
-            u1 = self.up1(d4)
-            u2 = self.up2(torch.cat([u1, d3], dim=1))
-            u3 = self.up3(torch.cat([u2, d2], dim=1))
-            u4 = self.up4(torch.cat([u3, d1], dim=1))
-            return u4
+        self.down1 = block(in_channels, 64)
+        self.down2 = block(64, 128)
+        self.down3 = block(128, 256)
+        self.down4 = block(256, 512)
 
-    unet_model = UNetGenerator().to(device)
-    checkpoint = torch.load(UNET_PATH, map_location=device)
-    unet_model.load_state_dict(checkpoint['model_state_dict'])
-    unet_model.eval()
+        self.up1 = up_block(512, 256)
+        self.up2 = up_block(512, 128)
+        self.up3 = up_block(256, 64)
+        self.up4 = nn.Sequential(
+            nn.ConvTranspose2d(128, out_channels, 4, 2, 1),
+            nn.Tanh()
+        )
 
-    return processor, parser_model, unet_model
+    def forward(self, x):
+        d1 = self.down1(x)
+        d2 = self.down2(d1)
+        d3 = self.down3(d2)
+        d4 = self.down4(d3)
 
-processor, parser_model, tryon_model = load_models()
+        u1 = self.up1(d4)
+        u2 = self.up2(torch.cat([u1, d3], dim=1))
+        u3 = self.up3(torch.cat([u2, d2], dim=1))
+        u4 = self.up4(torch.cat([u3, d1], dim=1))
+        return u4
 
+# ----------------- Load Try-On Model -----------------
+tryon_model = UNetGenerator().to(device)
+checkpoint = torch.load(UNET_PATH, map_location=device)
+tryon_model.load_state_dict(checkpoint['model_state_dict'])
+tryon_model.eval()
+
+# ----------------- Image Preprocessing -----------------
 img_transform = transforms.Compose([
     transforms.Resize((256, 192)),
     transforms.ToTensor()
@@ -281,21 +286,22 @@ def generate_agnostic(image: Image.Image, segmentation):
     img_np = np.array(image.resize((192, 256)))
     agnostic_np = img_np.copy()
     segmentation_resized = cv2.resize(segmentation.astype(np.uint8), (192, 256), interpolation=cv2.INTER_NEAREST)
-    agnostic_np[segmentation_resized == 4] = [128, 128, 128]  # Remove upper clothes
+    agnostic_np[segmentation_resized == 4] = [128, 128, 128]  # Mask upper clothes
     return Image.fromarray(agnostic_np)
 
 def generate_tryon_output(agnostic_img, cloth_img):
     agnostic_tensor = img_transform(agnostic_img).unsqueeze(0).to(device)
     cloth_tensor = img_transform(cloth_img).unsqueeze(0).to(device)
     input_tensor = torch.cat([agnostic_tensor, cloth_tensor], dim=1)
+
     with torch.no_grad():
         output = tryon_model(input_tensor)
     output_img = output.squeeze(0).cpu().permute(1, 2, 0).numpy()
     output_img = (output_img * 255).astype(np.uint8)
     return Image.fromarray(output_img)
 
-# ========== Streamlit UI ==========
-st.title("👕 Virtual Try-On App (Streamlit + Google Drive Models)")
+# ----------------- Streamlit UI -----------------
+st.title("👕 Virtual Try-On (2D UNet + Human Parser)")
 
 person_file = st.file_uploader("Upload a person image", type=["jpg", "jpeg", "png"])
 cloth_file = st.file_uploader("Upload a cloth image", type=["jpg", "jpeg", "png"])
@@ -306,13 +312,15 @@ if person_file and cloth_file:
 
     st.image([person_img, cloth_img], caption=["Person", "Cloth"], width=200)
 
-    with st.spinner("Parsing and masking torso..."):
-        seg_map = get_segmentation(person_img)
-        agnostic_img = generate_agnostic(person_img, seg_map)
-        st.subheader("Agnostic Image")
-        st.image(agnostic_img)
+    seg_map = get_segmentation(person_img)
+    agnostic_img = generate_agnostic(person_img, seg_map)
 
-    with st.spinner("Generating Try-On..."):
-        output_img = generate_tryon_output(agnostic_img, cloth_img)
-        st.subheader("Virtual Try-On Result")
-        st.image(output_img)
+    st.subheader("Agnostic Image (Torso Masked)")
+    st.image(agnostic_img)
+
+    output_img = generate_tryon_output(agnostic_img, cloth_img)
+
+    st.subheader("Virtual Try-On Output")
+    st.image(output_img, caption="Try-On Result")
+
+
