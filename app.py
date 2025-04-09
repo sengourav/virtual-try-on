@@ -167,7 +167,6 @@ from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
 import os
 import gdown
 import zipfile
-import cv2
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
