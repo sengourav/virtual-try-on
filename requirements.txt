@@ -5,5 +5,4 @@ transformers
 Pillow
 opencv-python
 numpy
-cv2
 gdown
