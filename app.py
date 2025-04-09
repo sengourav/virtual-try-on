@@ -14,7 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model_dir = "segformer"
 zip_path = "segformer.zip"
-drive_file_id = "1L0yDTL6uY63Dyg67dOd-0PbHlOUd9kuG"  # Replace with actual ID
+drive_file_id = "1PbRA6vNUcc0f3SFE9y-nLxhmT7g8d2V6"  # Replace with actual ID
 
 # Download and unzip if not already present
 if not os.path.exists(model_dir):
