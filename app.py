@@ -8,8 +8,23 @@ from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
 # import cv2
 import os
 import gdown
-
+import zipfile
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#download segformer
+
+model_dir = "segformer"
+zip_path = "segformer.zip"
+drive_file_id = "1L0yDTL6uY63Dyg67dOd-0PbHlOUd9kuG"  # Replace with actual ID
+
+# Download and unzip if not already present
+if not os.path.exists(model_dir):
+    gdown.download(f"https://drive.google.com/uc?id={drive_file_id}", zip_path, quiet=False)
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(".")
+
+# Load model from local dir
+processor = AutoImageProcessor.from_pretrained(model_dir)
+parser_model = SegformerForSemanticSegmentation.from_pretrained(model_dir).to(device).eval()
 
 #download try-on model
 MODEL_PATH = "viton_unet_full_checkpoint.pth"
