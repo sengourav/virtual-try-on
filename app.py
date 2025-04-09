@@ -14,8 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model_dir = "segformer"
 zip_path = "segformer.zip"
-drive_file_id = "1PbRA6vNUcc0f3SFE9y-nLxhmT7g8d2V6"  # Replace with actual ID
-
+drive_file_id = "1hpwO8RximyjmILpvsjOLJRi2Wq1AxM67"  # Replace with actual ID
 # Download and unzip if not already present
 if not os.path.exists(model_dir):
     gdown.download(f"https://drive.google.com/uc?id={drive_file_id}", zip_path, quiet=False)
