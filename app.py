@@ -21,8 +21,8 @@ if not os.path.exists(model_dir):
         zip_ref.extractall(".")
 
 # Initialize processor and model
-processor = AutoImageProcessor.from_pretrained(model_dir)
-parser_model = SegformerForSemanticSegmentation.from_pretrained(model_dir).to("cuda").eval()
+processor = AutoImageProcessor.from_pretrained(model_dir,local_files_only=True)
+parser_model = SegformerForSemanticSegmentation.from_pretrained(model_dir,local_files_only=True).to("cuda").eval()
 
 
 #download try-on model
