@@ -158,66 +158,58 @@
 #     st.image(output_img, caption="Virtual Try-On Result")
 
 
-
 import streamlit as st
-from PIL import Image
+import os
 import torch
 import numpy as np
+from PIL import Image
 from torchvision import transforms
-import torch.nn as nn
 from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
-import zipfile
-import os
+import torch.nn as nn
 import subprocess
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# ----------------- Google Drive Folder IDs -----------------
 UNET_MODEL_ID = "1SNdyZM2IWQ6L85VBH-B4JhkGKwEcSq2T"
-PARSER_MODEL_ZIP_ID = "d/1yX05Jx4vdgM9UxC70ByGMpXaPHL6rczb"
-PARSER_PROCESSOR_ZIP_ID = "1sta2fzcBg2SCzWRGwPB7Gz7kclZA3HM_"
+PARSER_MODEL_FOLDER_ID = "1uOAJpgvJ815xFs3Ihn8RhRjNs9GTxh4f"
+PARSER_PROCESSOR_FOLDER_ID = "1xsY9oNwoboJQozVPY8OgaChSmv93aL98"
 
-# ----------------- Config -----------------
+# ----------------- Local Paths -----------------
 UNET_PATH = "viton_unet_full_checkpoint.pth"
 PARSER_MODEL_DIR = "human_parser_model"
 PARSER_PROCESSOR_DIR = "human_parser_processor"
 
-
-# ----------------- Helper: Download from GDrive using wget -----------------
-def download_from_google_drive(file_id, output_path):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+# ----------------- Google Drive Folder Downloader -----------------
+def download_folder(folder_id: str, output_path: str):
     try:
-        subprocess.run([
-            "wget", "--no-check-certificate", "--content-disposition", "-O", output_path, url
-        ], check=True)
-    except subprocess.CalledProcessError:
-        st.error(f"Failed to download {output_path}")
+        import gdown
+        gdown.download_folder(id=folder_id, output=output_path, quiet=False, use_cookies=False)
+    except Exception as e:
+        st.error(f"❌ Failed to download folder: {output_path}\n{e}")
 
-# ----------------- Download Dependencies -----------------
+def download_file(file_id: str, output_path: str):
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    subprocess.run(["wget", "-O", output_path, url], check=True)
+
+# ----------------- Download Required Files -----------------
 if not os.path.exists(UNET_PATH):
     with st.spinner("Downloading UNet model..."):
-        download_from_google_drive(UNET_MODEL_ID, UNET_PATH)
+        download_file(UNET_MODEL_ID, UNET_PATH)
 
 if not os.path.exists(PARSER_MODEL_DIR):
-    with st.spinner("Downloading Human Parser Model..."):
-        zip_path = "parser_model.zip"
-        download_from_google_drive(PARSER_MODEL_ZIP_ID, zip_path)
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(PARSER_MODEL_DIR)
-        os.remove(zip_path)
+    with st.spinner("Downloading Human Parser Model folder..."):
+        download_folder(PARSER_MODEL_FOLDER_ID, PARSER_MODEL_DIR)
 
 if not os.path.exists(PARSER_PROCESSOR_DIR):
-    with st.spinner("Downloading Human Parser Processor..."):
-        zip_path = "parser_processor.zip"
-        download_from_google_drive(PARSER_PROCESSOR_ZIP_ID, zip_path)
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(PARSER_PROCESSOR_DIR)
-        os.remove(zip_path)
+    with st.spinner("Downloading Human Parser Processor folder..."):
+        download_folder(PARSER_PROCESSOR_FOLDER_ID, PARSER_PROCESSOR_DIR)
 
-# ----------------- Load Human Parser -----------------
+# ----------------- Load Human Parser Model -----------------
 processor = AutoImageProcessor.from_pretrained(PARSER_PROCESSOR_DIR)
 parser_model = SegformerForSemanticSegmentation.from_pretrained(PARSER_MODEL_DIR).to(device).eval()
 
-# ----------------- Define UNet -----------------
+# ----------------- UNet Definition -----------------
 class UNetGenerator(nn.Module):
     def __init__(self, in_channels=6, out_channels=3):
         super(UNetGenerator, self).__init__()
@@ -261,7 +253,7 @@ class UNetGenerator(nn.Module):
         u4 = self.up4(torch.cat([u3, d1], dim=1))
         return u4
 
-# ----------------- Load Try-On Model -----------------
+# ----------------- Load UNet Model -----------------
 tryon_model = UNetGenerator().to(device)
 checkpoint = torch.load(UNET_PATH, map_location=device)
 tryon_model.load_state_dict(checkpoint['model_state_dict'])
@@ -286,7 +278,7 @@ def generate_agnostic(image: Image.Image, segmentation):
     img_np = np.array(image.resize((192, 256)))
     agnostic_np = img_np.copy()
     segmentation_resized = cv2.resize(segmentation.astype(np.uint8), (192, 256), interpolation=cv2.INTER_NEAREST)
-    agnostic_np[segmentation_resized == 4] = [128, 128, 128]  # Mask upper clothes
+    agnostic_np[segmentation_resized == 4] = [128, 128, 128]  # Upper-clothes class
     return Image.fromarray(agnostic_np)
 
 def generate_tryon_output(agnostic_img, cloth_img):
@@ -301,7 +293,7 @@ def generate_tryon_output(agnostic_img, cloth_img):
     return Image.fromarray(output_img)
 
 # ----------------- Streamlit UI -----------------
-st.title("👕 Virtual Try-On (2D UNet + Human Parser)")
+st.title("👕 Virtual Try-On (UNet + Human Parser)")
 
 person_file = st.file_uploader("Upload a person image", type=["jpg", "jpeg", "png"])
 cloth_file = st.file_uploader("Upload a cloth image", type=["jpg", "jpeg", "png"])
