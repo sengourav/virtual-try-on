@@ -11,19 +11,19 @@ import gdown
 import zipfile
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #download segformer
-
 model_dir = "segformer"
 zip_path = "segformer.zip"
-drive_file_id = "1hpwO8RximyjmILpvsjOLJRi2Wq1AxM67"  # Replace with actual ID
-# Download and unzip if not already present
+url = "https://drive.google.com/uc?export=download&id=1hpwO8RximyjmILpvsjOLJRi2Wq1AxM67"
+
 if not os.path.exists(model_dir):
-    gdown.download(f"https://drive.google.com/uc?id={drive_file_id}", zip_path, quiet=False)
+    os.system(f"wget --no-check-certificate '{url}' -O {zip_path}")
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(".")
 
-# Load model from local dir
+# Initialize processor and model
 processor = AutoImageProcessor.from_pretrained(model_dir)
-parser_model = SegformerForSemanticSegmentation.from_pretrained(model_dir).to(device).eval()
+parser_model = SegformerForSemanticSegmentation.from_pretrained(model_dir).to("cuda").eval()
+
 
 #download try-on model
 MODEL_PATH = "viton_unet_full_checkpoint.pth"
