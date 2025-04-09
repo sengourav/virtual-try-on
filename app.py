@@ -6,8 +6,21 @@ from torchvision import transforms
 import torch.nn as nn
 from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
 import cv2
+import os
+import gdown
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+#download try-on model
+MODEL_PATH = "viton_unet_full_checkpoint.pth"
+GDRIVE_ID = "1SNdyZM2IWQ6L85VBH-B4JhkGKwEcSq2T"
+GDRIVE_URL = f"https://drive.google.com/uc?id={GDRIVE_ID}"
+
+# Download only if not already present
+if not os.path.exists(MODEL_PATH):
+    with st.spinner("Downloading model weights..."):
+        gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
+
 # Load segmentation model
 processor = AutoImageProcessor.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
 parser_model = SegformerForSemanticSegmentation.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing").to(device).eval()
