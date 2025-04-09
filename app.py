@@ -37,8 +37,8 @@ if not os.path.exists(MODEL_PATH):
         gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
 
 # Load segmentation model
-processor = AutoImageProcessor.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
-parser_model = SegformerForSemanticSegmentation.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing").to(device).eval()
+# processor = AutoImageProcessor.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
+# parser_model = SegformerForSemanticSegmentation.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing").to(device).eval()
 # Load your trained try-on model
 
 
