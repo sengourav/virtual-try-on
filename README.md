@@ -1,6 +1,6 @@
 # Virtual Try-On (VTON) Framework
+![Virtual Try-On Demo](https://github.com/user-attachments/assets/de28b114-d07f-422b-aeb6-6f85586fa27a)
 
-![Virtual Try-On Demo](docs/images/banner.png)
 
 > An extensive framework implementing four different approaches to virtual clothing try-on
 
