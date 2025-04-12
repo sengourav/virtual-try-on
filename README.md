@@ -20,6 +20,9 @@ This repository contains implementations of four different approaches to virtual
 
 Each method represents different stages in the evolution of virtual try-on technology, from traditional computer vision techniques to advanced generative models.
 
+## Virtual-Try-On Demo
+
+Try our demo on Hugging Face Spaces: [Virtual Try-On Demo](https://huggingface.co/spaces/sengourav012/virtual-try-on)
 ## Models
 
 ### 1. Traditional CV-based Approach
@@ -91,9 +94,6 @@ Detailed documentation for each approach:
 - `training_procedures.md`: Training protocols and hyperparameters
 - `results_comparison.md`: Quantitative and qualitative comparison
 
-## Hugging Face Demo
-
-Try our demo on Hugging Face Spaces: [Virtual Try-On Demo](https://huggingface.co/spaces/your-username/virtual-try-on)
 
 ## License
 
